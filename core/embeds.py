@@ -71,7 +71,7 @@ def build_embed(
     )
 
     if poster_url:
-        embed.set_thumbnail(url=poster_url)
+        embed.set_image(url=poster_url)
 
     # Links field: review first, then film pages
     link_parts: list[str] = [f"[Review]({entry.review_url})"]
