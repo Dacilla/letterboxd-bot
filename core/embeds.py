@@ -16,18 +16,18 @@ MAX_REVIEW_LENGTH = 900
 def format_rating(rating: float) -> str:
     """
     Convert a numeric Letterboxd rating (0.5–5.0, increments of 0.5)
-    into a star string, e.g. 3.5 -> ★★★½☆
+    into an emoji star string, e.g. 3.5 -> ⭐⭐⭐½
     """
     full_stars = int(rating)
     has_half = (rating % 1) >= 0.5
-    empty_stars = 5 - full_stars - (1 if has_half else 0)
-    return "★" * full_stars + ("½" if has_half else "") + "☆" * empty_stars
+    return "⭐" * full_stars + ("½" if has_half else "")
 
 
 def build_embed(
     entry: LBEntry,
     tmdb_url: Optional[str],
     poster_url: Optional[str],
+    avatar_url: Optional[str] = None,
 ) -> discord.Embed:
     """
     Build a Discord embed for a Letterboxd diary entry.
@@ -39,12 +39,12 @@ def build_embed(
     if entry.film_year:
         title += f" ({entry.film_year})"
 
-    # First line of description: rating stars + heart indicator
+    # First line: rating stars + heart indicator
     header_parts: list[str] = []
     if entry.rating is not None:
         header_parts.append(format_rating(entry.rating))
     if entry.liked:
-        header_parts.append("♥")
+        header_parts.append("❤️")
 
     description_parts: list[str] = []
     if header_parts:
@@ -57,8 +57,9 @@ def build_embed(
         description_parts.append(f"\n{review}")
 
     embed = discord.Embed(
+        # Title links to the film page on Letterboxd
         title=title,
-        url=entry.review_url,
+        url=entry.film_url,
         description="\n".join(description_parts) or None,
         color=LETTERBOXD_GREEN,
     )
@@ -66,13 +67,15 @@ def build_embed(
     embed.set_author(
         name=entry.username,
         url=f"https://letterboxd.com/{entry.username}/",
+        icon_url=avatar_url or None,
     )
 
     if poster_url:
         embed.set_thumbnail(url=poster_url)
 
-    # Build a tidy links field
-    link_parts: list[str] = [f"[Letterboxd]({entry.film_url})"]
+    # Links field: review first, then film pages
+    link_parts: list[str] = [f"[Review]({entry.review_url})"]
+    link_parts.append(f"[Letterboxd]({entry.film_url})")
     if tmdb_url:
         link_parts.append(f"[TMDB]({tmdb_url})")
 

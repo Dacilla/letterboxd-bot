@@ -9,7 +9,7 @@ from discord import app_commands
 from discord.ext import commands, tasks
 
 from core import database, embeds
-from core.feed import fetch_feed
+from core.feed import LBEntry, fetch_feed, get_avatar_url
 from core.tmdb import search_movie
 
 POLL_INTERVAL_MINUTES: int = int(os.getenv("POLL_INTERVAL_MINUTES", 10))
@@ -20,6 +20,8 @@ class LetterboxdCog(commands.Cog):
         self.bot = bot
         self.tmdb_key: Optional[str] = os.getenv("TMDB_API_KEY")
         self.session: Optional[aiohttp.ClientSession] = None
+        # Simple in-memory avatar cache so we don't scrape on every poll
+        self._avatar_cache: dict[str, Optional[str]] = {}
 
     # ------------------------------------------------------------------
     # Lifecycle
@@ -63,6 +65,12 @@ class LetterboxdCog(commands.Cog):
         for user in followed:
             await self._scan_user(user)
 
+    async def _get_avatar(self, username: str) -> Optional[str]:
+        """Return a cached avatar URL, fetching and caching it if not seen before."""
+        if username not in self._avatar_cache:
+            self._avatar_cache[username] = await get_avatar_url(username, self.session)
+        return self._avatar_cache[username]
+
     async def _scan_user(self, user: dict) -> None:
         username: str = user["letterboxd_username"]
         channel_id: int = user["channel_id"]
@@ -72,6 +80,7 @@ class LetterboxdCog(commands.Cog):
             return
 
         entries = await fetch_feed(username, self.session)
+        avatar_url = await self._get_avatar(username)
 
         # Reverse so we post oldest-new entry first (chronological order).
         for entry in reversed(entries):
@@ -93,7 +102,7 @@ class LetterboxdCog(commands.Cog):
                     # Prefer the TMDB poster; it's usually higher quality.
                     poster_url = result["poster_url"] or poster_url
 
-            embed = embeds.build_embed(entry, tmdb_url, poster_url)
+            embed = embeds.build_embed(entry, tmdb_url, poster_url, avatar_url)
             await channel.send(embed=embed)
 
     # ------------------------------------------------------------------
@@ -178,7 +187,7 @@ class LetterboxdCog(commands.Cog):
         lines: list[str] = []
         for u in users:
             channel = self.bot.get_channel(u["channel_id"])
-            channel_str = channel.mention if channel else f"*(deleted channel)*"
+            channel_str = channel.mention if channel else "*(deleted channel)*"
             lines.append(f"**{u['letterboxd_username']}** → {channel_str}")
 
         embed = discord.Embed(
@@ -205,7 +214,7 @@ class LetterboxdCog(commands.Cog):
         description="Post a sample review embed so you can see what it looks like.",
     )
     async def preview(self, interaction: discord.Interaction) -> None:
-        from core.feed import LBEntry
+        await interaction.response.defer()
 
         dummy_entry = LBEntry(
             guid="preview-dummy-guid",
@@ -221,17 +230,28 @@ class LetterboxdCog(commands.Cog):
                 "Naomi Watts is extraordinary. One of those films that gets stranger "
                 "and richer every time you watch it."
             ),
-            review_url="https://letterboxd.com/",
+            review_url="https://letterboxd.com/film/mulholland-drive/",
             film_url="https://letterboxd.com/film/mulholland-drive/",
             rss_poster_url=None,
         )
 
-        tmdb_url = "https://www.themoviedb.org/movie/1018"
-        poster_url = "https://image.tmdb.org/t/p/w500/56cph0HsTQXGEQEKoZTSAJyGMbO.jpg"
+        # Do a live TMDB lookup so the poster is always fresh
+        tmdb_url: Optional[str] = None
+        poster_url: Optional[str] = None
+        if self.tmdb_key:
+            result = await search_movie(
+                dummy_entry.film_title, dummy_entry.film_year, self.session, self.tmdb_key
+            )
+            if result:
+                tmdb_url = result["url"]
+                poster_url = result["poster_url"]
 
-        embed = embeds.build_embed(dummy_entry, tmdb_url, poster_url)
+        # Use the invoking user's Discord avatar as a stand-in for the Letterboxd avatar
+        avatar_url = interaction.user.display_avatar.url
+
+        embed = embeds.build_embed(dummy_entry, tmdb_url, poster_url, avatar_url)
         embed.set_footer(text="This is a preview — not a real review.")
-        await interaction.response.send_message(embed=embed)
+        await interaction.followup.send(embed=embed)
 
     # ------------------------------------------------------------------
     # Error handler
