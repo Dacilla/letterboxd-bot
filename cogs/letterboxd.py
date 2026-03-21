@@ -200,6 +200,39 @@ class LetterboxdCog(commands.Cog):
         await self._scan_all(guild_id=interaction.guild_id)
         await interaction.edit_original_response(content="Scan complete.")
 
+    @app_commands.command(
+        name="preview",
+        description="Post a sample review embed so you can see what it looks like.",
+    )
+    async def preview(self, interaction: discord.Interaction) -> None:
+        from core.feed import LBEntry
+
+        dummy_entry = LBEntry(
+            guid="preview-dummy-guid",
+            username=interaction.user.display_name,
+            film_title="Mulholland Drive",
+            film_year=2001,
+            rating=4.5,
+            liked=True,
+            review_text=(
+                "Lynch at his most hypnotic. The first two acts build an almost "
+                "unbearable sense of dread and longing, and then the rug pull in "
+                "the third recontextualises everything you thought you understood. "
+                "Naomi Watts is extraordinary. One of those films that gets stranger "
+                "and richer every time you watch it."
+            ),
+            review_url="https://letterboxd.com/",
+            film_url="https://letterboxd.com/film/mulholland-drive/",
+            rss_poster_url=None,
+        )
+
+        tmdb_url = "https://www.themoviedb.org/movie/1018"
+        poster_url = "https://image.tmdb.org/t/p/w500/56cph0HsTQXGEQEKoZTSAJyGMbO.jpg"
+
+        embed = embeds.build_embed(dummy_entry, tmdb_url, poster_url)
+        embed.set_footer(text="This is a preview — not a real review.")
+        await interaction.response.send_message(embed=embed)
+
     # ------------------------------------------------------------------
     # Error handler
     # ------------------------------------------------------------------

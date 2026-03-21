@@ -19,6 +19,7 @@ A Discord bot that monitors Letterboxd RSS feeds and posts reviews as rich embed
 | `/unfollow <username>` | Manage Server | Stop following a user |
 | `/following` | Everyone | List all followed accounts in this server |
 | `/scan` | Manage Server | Force an immediate scan, bypassing the timer |
+| `/preview` | Everyone | Post a sample review embed to see how it looks |
 
 ## Setup
 
