@@ -18,9 +18,10 @@ class LBEntry:
     rating: Optional[float]
     liked: bool
     review_text: Optional[str]
-    review_url: str       # link to diary entry / review
-    film_url: str         # letterboxd.com/film/<slug>/
+    review_url: str         # link to diary entry / review
+    film_url: str           # letterboxd.com/film/<slug>/
     rss_poster_url: Optional[str]  # poster extracted from RSS description HTML
+    tmdb_id: Optional[str]  # TMDB movie ID if present in feed
 
 
 async def get_avatar_url(
@@ -85,7 +86,10 @@ async def fetch_feed(
         rating_raw = entry.get("letterboxd_memberrating")
         rating = float(rating_raw) if rating_raw else None
 
-        liked = entry.get("letterboxd_liked", "No").lower() == "yes"
+        # The correct field name is letterboxd_memberlike (not letterboxd_liked)
+        liked = entry.get("letterboxd_memberlike", "No").strip().lower() == "yes"
+
+        tmdb_id: Optional[str] = entry.get("tmdb_movieid") or None
 
         description_html: str = entry.get("description") or entry.get("summary") or ""
         review_text, rss_poster_url = _parse_description(description_html)
@@ -108,6 +112,7 @@ async def fetch_feed(
                 review_url=review_url,
                 film_url=film_url,
                 rss_poster_url=rss_poster_url,
+                tmdb_id=tmdb_id,
             )
         )
 

@@ -10,7 +10,7 @@ from discord.ext import commands, tasks
 
 from core import database, embeds
 from core.feed import LBEntry, fetch_feed, get_avatar_url
-from core.tmdb import search_movie
+from core.tmdb import get_movie_by_id, search_movie
 
 POLL_INTERVAL_MINUTES: int = int(os.getenv("POLL_INTERVAL_MINUTES", 10))
 
@@ -94,12 +94,16 @@ class LetterboxdCog(commands.Cog):
             poster_url: Optional[str] = entry.rss_poster_url
 
             if self.tmdb_key:
-                result = await search_movie(
-                    entry.film_title, entry.film_year, self.session, self.tmdb_key
-                )
+                if entry.tmdb_id:
+                    result = await get_movie_by_id(
+                        entry.tmdb_id, self.session, self.tmdb_key
+                    )
+                else:
+                    result = await search_movie(
+                        entry.film_title, entry.film_year, self.session, self.tmdb_key
+                    )
                 if result:
                     tmdb_url = result["url"]
-                    # Prefer the TMDB poster; it's usually higher quality.
                     poster_url = result["poster_url"] or poster_url
 
             embed = embeds.build_embed(entry, tmdb_url, poster_url, avatar_url)

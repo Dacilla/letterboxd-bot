@@ -8,6 +8,34 @@ TMDB_API_BASE = "https://api.themoviedb.org/3"
 TMDB_IMAGE_BASE = "https://image.tmdb.org/t/p/w500"
 
 
+async def get_movie_by_id(
+    tmdb_id: str,
+    session: aiohttp.ClientSession,
+    api_key: str,
+) -> Optional[dict]:
+    """
+    Fetch movie details directly by TMDB ID.
+    Faster and more accurate than searching by title.
+    """
+    try:
+        async with session.get(
+            f"{TMDB_API_BASE}/movie/{tmdb_id}",
+            params={"api_key": api_key},
+            timeout=aiohttp.ClientTimeout(total=10),
+        ) as resp:
+            if resp.status != 200:
+                return None
+            data = await resp.json()
+    except Exception:
+        return None
+
+    poster_path = data.get("poster_path")
+    return {
+        "url": f"https://www.themoviedb.org/movie/{tmdb_id}",
+        "poster_url": f"{TMDB_IMAGE_BASE}{poster_path}" if poster_path else None,
+    }
+
+
 async def search_movie(
     title: str,
     year: Optional[int],
@@ -15,13 +43,8 @@ async def search_movie(
     api_key: str,
 ) -> Optional[dict]:
     """
-    Search TMDB for a film by title and optional year.
-
-    Returns a dict with keys:
-        'url'        - https://www.themoviedb.org/movie/{id}
-        'poster_url' - full poster image URL, or None
-
-    Returns None if no result is found or the request fails.
+    Fallback: search TMDB by title and optional year.
+    Only used when no tmdb_movieid is present in the RSS feed.
     """
     params: dict = {
         "api_key": api_key,
