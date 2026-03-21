@@ -12,15 +12,18 @@ LETTERBOXD_GREEN = 0x00C030
 # Max review length before truncation. Discord embed description cap is 4096.
 MAX_REVIEW_LENGTH = 900
 
+STAR_FULL = "<:star_full:1484847326534045816>"
+STAR_HALF = "<:star_half:1484847324617248871>"
+
 
 def format_rating(rating: float) -> str:
     """
     Convert a numeric Letterboxd rating (0.5–5.0, increments of 0.5)
-    into an emoji star string, e.g. 3.5 -> ⭐⭐⭐½
+    into a custom emote string, e.g. 3.5 -> star star star star_half
     """
     full_stars = int(rating)
     has_half = (rating % 1) >= 0.5
-    return "⭐" * full_stars + ("½" if has_half else "")
+    return STAR_FULL * full_stars + (STAR_HALF if has_half else "")
 
 
 def build_embed(
@@ -57,7 +60,6 @@ def build_embed(
         description_parts.append(f"\n{review}")
 
     embed = discord.Embed(
-        # Title links to the film page on Letterboxd
         title=title,
         url=entry.film_url,
         description="\n".join(description_parts) or None,
@@ -71,7 +73,7 @@ def build_embed(
     )
 
     if poster_url:
-        embed.set_image(url=poster_url)
+        embed.set_thumbnail(url=poster_url)
 
     # Links field: review first, then film pages
     link_parts: list[str] = [f"[Review]({entry.review_url})"]
