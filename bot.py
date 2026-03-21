@@ -17,16 +17,14 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 async def on_ready() -> None:
     print(f"Logged in as {bot.user} (ID: {bot.user.id})")
     print(f"Guilds: {len(bot.guilds)}")
+    await bot.tree.sync()
+    print("Slash commands synced.")
 
 
 async def main() -> None:
     async with bot:
         await init_db()
         await bot.load_extension("cogs.letterboxd")
-        # Sync slash commands globally.
-        # On first deploy this can take up to an hour to propagate;
-        # for faster testing, use tree.sync(guild=discord.Object(id=YOUR_GUILD_ID)).
-        await bot.tree.sync()
         await bot.start(os.environ["DISCORD_TOKEN"])
 
 
