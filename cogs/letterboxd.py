@@ -217,7 +217,8 @@ class LetterboxdCog(commands.Cog):
         name="preview",
         description="Post a sample review embed so you can see what it looks like.",
     )
-    async def preview(self, interaction: discord.Interaction) -> None:
+    @app_commands.describe(spoiler="Preview what a spoiler-tagged review looks like.")
+    async def preview(self, interaction: discord.Interaction, spoiler: bool = False) -> None:
         await interaction.response.defer()
 
         dummy_entry = LBEntry(
@@ -234,7 +235,7 @@ class LetterboxdCog(commands.Cog):
                 "Naomi Watts is extraordinary. One of those films that gets stranger "
                 "and richer every time you watch it."
             ),
-            spoiler=False,
+            spoiler=spoiler,
             review_url="https://letterboxd.com/film/mulholland-drive/",
             film_url="https://letterboxd.com/film/mulholland-drive/",
             rss_poster_url=None,
