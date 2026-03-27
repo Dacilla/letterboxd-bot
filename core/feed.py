@@ -18,6 +18,7 @@ class LBEntry:
     rating: Optional[float]
     liked: bool
     review_text: Optional[str]
+    spoiler: bool
     review_url: str         # link to diary entry / review
     film_url: str           # letterboxd.com/film/<slug>/
     rss_poster_url: Optional[str]  # poster extracted from RSS description HTML
@@ -91,6 +92,10 @@ async def fetch_feed(
 
         tmdb_id: Optional[str] = entry.get("tmdb_movieid") or None
 
+        spoiler = (
+            entry.get("letterboxd_containsspoilers", "No").strip().lower() == "yes"
+        )
+
         description_html: str = entry.get("description") or entry.get("summary") or ""
         review_text, rss_poster_url = _parse_description(description_html)
 
@@ -109,6 +114,7 @@ async def fetch_feed(
                 rating=rating,
                 liked=liked,
                 review_text=review_text,
+                spoiler=spoiler,
                 review_url=review_url,
                 film_url=film_url,
                 rss_poster_url=rss_poster_url,

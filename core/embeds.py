@@ -53,10 +53,15 @@ def build_embed(
     if header_parts:
         description_parts.append(" ".join(header_parts))
 
+    if entry.spoiler:
+        description_parts.append("*This review contains spoilers.*")
+
     if entry.review_text:
         review = entry.review_text
         if len(review) > MAX_REVIEW_LENGTH:
             review = review[:MAX_REVIEW_LENGTH].rstrip() + "…"
+        if entry.spoiler:
+            review = f"||{review}||"
         description_parts.append(f"\n{review}")
 
     embed = discord.Embed(
