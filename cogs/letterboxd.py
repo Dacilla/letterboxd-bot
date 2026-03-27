@@ -234,9 +234,11 @@ class LetterboxdCog(commands.Cog):
                 "Naomi Watts is extraordinary. One of those films that gets stranger "
                 "and richer every time you watch it."
             ),
+            spoiler=False,
             review_url="https://letterboxd.com/film/mulholland-drive/",
             film_url="https://letterboxd.com/film/mulholland-drive/",
             rss_poster_url=None,
+            tmdb_id=None,
         )
 
         # Do a live TMDB lookup so the poster is always fresh
@@ -264,15 +266,18 @@ class LetterboxdCog(commands.Cog):
     async def cog_app_command_error(
         self, interaction: discord.Interaction, error: app_commands.AppCommandError
     ) -> None:
+        respond = (
+            interaction.followup.send
+            if interaction.response.is_done()
+            else interaction.response.send_message
+        )
         if isinstance(error, app_commands.MissingPermissions):
-            await interaction.response.send_message(
+            await respond(
                 "You need the **Manage Server** permission to use that command.",
                 ephemeral=True,
             )
         else:
-            await interaction.response.send_message(
-                f"An error occurred: {error}", ephemeral=True
-            )
+            await respond(f"An error occurred: {error}", ephemeral=True)
             raise error
 
 
