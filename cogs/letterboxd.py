@@ -217,8 +217,16 @@ class LetterboxdCog(commands.Cog):
         name="preview",
         description="Post a sample review embed so you can see what it looks like.",
     )
-    @app_commands.describe(spoiler="Preview what a spoiler-tagged review looks like.")
-    async def preview(self, interaction: discord.Interaction, spoiler: bool = False) -> None:
+    @app_commands.describe(
+        spoiler="Preview what a spoiler-tagged review looks like.",
+        rewatch="Preview what a rewatch review looks like.",
+    )
+    async def preview(
+        self,
+        interaction: discord.Interaction,
+        spoiler: bool = False,
+        rewatch: bool = False,
+    ) -> None:
         await interaction.response.defer()
 
         dummy_entry = LBEntry(
@@ -228,6 +236,7 @@ class LetterboxdCog(commands.Cog):
             film_year=2001,
             rating=4.5,
             liked=True,
+            rewatch=rewatch,
             review_text=(
                 "Lynch at his most hypnotic. The first two acts build an almost "
                 "unbearable sense of dread and longing, and then the rug pull in "

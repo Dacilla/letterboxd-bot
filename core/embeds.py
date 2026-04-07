@@ -48,6 +48,8 @@ def build_embed(
         header_parts.append(format_rating(entry.rating))
     if entry.liked:
         header_parts.append("❤️")
+    if entry.rewatch:
+        header_parts.append("Rewatch")
 
     description_parts: list[str] = []
     if header_parts:

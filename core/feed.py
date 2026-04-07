@@ -17,6 +17,7 @@ class LBEntry:
     film_year: Optional[int]
     rating: Optional[float]
     liked: bool
+    rewatch: bool
     review_text: Optional[str]
     spoiler: bool
     review_url: str         # link to diary entry / review
@@ -89,6 +90,7 @@ async def fetch_feed(
 
         # The correct field name is letterboxd_memberlike (not letterboxd_liked)
         liked = entry.get("letterboxd_memberlike", "No").strip().lower() == "yes"
+        rewatch = entry.get("letterboxd_rewatch", "No").strip().lower() == "yes"
 
         tmdb_id: Optional[str] = entry.get("tmdb_movieid") or None
 
@@ -113,6 +115,7 @@ async def fetch_feed(
                 film_year=film_year,
                 rating=rating,
                 liked=liked,
+                rewatch=rewatch,
                 review_text=review_text,
                 spoiler=spoiler,
                 review_url=review_url,
