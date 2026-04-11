@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import hashlib
 from typing import Optional
+from urllib.parse import urlencode
 
 import discord
 
@@ -15,6 +17,15 @@ MAX_REVIEW_LENGTH = 900
 STAR_FULL = "<:star_full:1484847326534045816>"
 STAR_HALF = "<:star_half:1484847324617248871>"
 
+AVATAR_PLACEHOLDER_BACKGROUNDS = (
+    "00C030",
+    "00A2FF",
+    "FF8000",
+    "E5A00D",
+    "7B61FF",
+    "FF5C8A",
+)
+
 
 def format_rating(rating: float) -> str:
     """
@@ -24,6 +35,27 @@ def format_rating(rating: float) -> str:
     full_stars = int(rating)
     has_half = (rating % 1) >= 0.5
     return STAR_FULL * full_stars + (STAR_HALF if has_half else "")
+
+
+def default_avatar_url(username: str) -> str:
+    """
+    Build a deterministic initials avatar URL for users without a profile image.
+    """
+    normalized = username.strip() or "?"
+    digest = hashlib.sha256(normalized.lower().encode("utf-8")).digest()
+    background = AVATAR_PLACEHOLDER_BACKGROUNDS[
+        digest[0] % len(AVATAR_PLACEHOLDER_BACKGROUNDS)
+    ]
+    params = {
+        "name": normalized,
+        "length": 2,
+        "size": 128,
+        "background": background,
+        "color": "FFFFFF",
+        "bold": "true",
+        "format": "png",
+    }
+    return f"https://ui-avatars.com/api/?{urlencode(params)}"
 
 
 def build_embed(
@@ -76,7 +108,7 @@ def build_embed(
     embed.set_author(
         name=entry.username,
         url=f"https://letterboxd.com/{entry.username}/",
-        icon_url=avatar_url or None,
+        icon_url=avatar_url or default_avatar_url(entry.username),
     )
 
     if poster_url:
