@@ -6,7 +6,7 @@ from typing import Optional
 
 import aiohttp
 import feedparser
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup, NavigableString, Tag
 
 
 @dataclass
@@ -141,11 +141,99 @@ def _parse_description(html: str) -> tuple[Optional[str], Optional[str]]:
         poster_url = img.get("src") or None
         img.decompose()  # remove so it doesn't pollute the text
 
-    text = soup.get_text(separator="\n").strip()
-    # Collapse excessive blank lines
-    text = re.sub(r"\n{3,}", "\n\n", text).strip()
+    text = _html_to_discord_markdown(soup)
 
     return (text if text else None), poster_url
+
+
+def _html_to_discord_markdown(soup: BeautifulSoup) -> str:
+    """
+    Convert Letterboxd review HTML into Discord-friendly Markdown.
+
+    BeautifulSoup.get_text(separator="\n") treats inline formatting tags as
+    separator boundaries, so "a <i>movie</i>" becomes three lines. Keep block
+    spacing at block tags instead.
+    """
+    blocks: list[str] = []
+
+    for child in soup.contents:
+        if isinstance(child, NavigableString):
+            text = _normalize_inline_text(str(child)).strip()
+        elif isinstance(child, Tag):
+            text = _format_html_block(child).strip()
+        else:
+            continue
+
+        if text:
+            blocks.append(text)
+
+    text = "\n\n".join(blocks)
+    text = re.sub(r"\n{3,}", "\n\n", text)
+    return text.strip()
+
+
+def _format_html_block(tag: Tag) -> str:
+    name = tag.name.lower()
+    text = _format_html_inline_children(tag)
+
+    if name == "blockquote":
+        return "\n".join(f"> {line}" if line else ">" for line in text.splitlines())
+
+    if name in {"ul", "ol"}:
+        items: list[str] = []
+        for index, item in enumerate(tag.find_all("li", recursive=False), start=1):
+            item_text = _format_html_inline_children(item).strip()
+            if item_text:
+                marker = f"{index}." if name == "ol" else "-"
+                items.append(f"{marker} {item_text}")
+        return "\n".join(items)
+
+    return text
+
+
+def _format_html_inline_children(tag: Tag) -> str:
+    return "".join(_format_html_inline(child) for child in tag.children)
+
+
+def _format_html_inline(node: object) -> str:
+    if isinstance(node, NavigableString):
+        return _normalize_inline_text(str(node))
+    if not isinstance(node, Tag):
+        return ""
+
+    name = node.name.lower()
+    if name == "br":
+        return "\n"
+
+    text = _format_html_inline_children(node)
+    if not text:
+        return ""
+
+    if name in {"i", "em"}:
+        return _wrap_discord_markdown(text, "*")
+    if name in {"b", "strong"}:
+        return _wrap_discord_markdown(text, "**")
+    if name in {"s", "strike", "del"}:
+        return _wrap_discord_markdown(text, "~~")
+    if name == "a":
+        href = node.get("href")
+        if href:
+            return f"[{text}]({href})"
+
+    return text
+
+
+def _wrap_discord_markdown(text: str, marker: str) -> str:
+    leading = text[: len(text) - len(text.lstrip())]
+    trailing = text[len(text.rstrip()) :]
+    core = text.strip()
+    if not core:
+        return text
+    return f"{leading}{marker}{core}{marker}{trailing}"
+
+
+def _normalize_inline_text(text: str) -> str:
+    return text.replace("\xa0", " ")
 
 
 def _derive_film_url(review_url: str) -> str:
