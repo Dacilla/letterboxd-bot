@@ -56,7 +56,8 @@ core/database.py    → SQLite operations (followed_users, seen_entries tables)
 ## Key Implementation Notes
 
 - `cog_load()` creates the `aiohttp.ClientSession` and starts the `poll_loop` task; `cog_unload()` cancels and closes
-- Avatar URLs are cached in-memory per session (`_avatar_cache` dict in the cog)
+- Avatars are persisted in `followed_users` (`avatar_url`, `avatar_fetched_at`) per Letterboxd user, shared across guilds. `_get_avatar` in the cog only scrapes when nothing is stored or the stored URL is older than `AVATAR_REFRESH_HOURS` (default 24); on scrape failure it reuses the stored URL, so placeholders only appear for users never successfully scraped
+- Avatar scraping uses `curl_cffi` with Chrome impersonation: Letterboxd's Cloudflare protection TLS-fingerprints clients and 403-challenges plain Python HTTP stacks (aiohttp/requests) on HTML pages, even with browser headers. RSS endpoints are not protected this way
 - TMDB lookup uses the `tmdb_id` field from RSS if present (fast path via `get_movie_by_id()`), else falls back to `search_movie()` by title+year
 - Custom Discord emote IDs for star ratings are hardcoded in `core/embeds.py` — if moving to a new server, these need updating
 - Global slash command sync (`tree.sync()`) can take up to 1 hour to propagate; for testing, sync to a specific guild ID instead

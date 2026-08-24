@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import time
 from typing import Optional
 
 import aiohttp
@@ -14,21 +15,35 @@ from core.tmdb import get_movie_by_id, search_movie
 
 POLL_INTERVAL_MINUTES: int = int(os.getenv("POLL_INTERVAL_MINUTES", 10))
 
+# How often to re-check a user's Letterboxd profile for an avatar change.
+# Between checks (and whenever Cloudflare blocks a check) we keep using the
+# last avatar saved in the DB, so placeholders should only ever appear for
+# users whose avatar has never been fetched successfully.
+AVATAR_REFRESH_HOURS: int = int(os.getenv("AVATAR_REFRESH_HOURS", 24))
+
+# Letterboxd's Cloudflare protection rejects the default aiohttp
+# "Python/3.x aiohttp/x.x" user-agent on HTML pages (RSS endpoints still allow
+# it, but send a browser-like UA everywhere to stay under the radar).
+REQUEST_HEADERS = {
+    "User-Agent": (
+        "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
+        "(KHTML, like Gecko) Chrome/126.0 Safari/537.36"
+    )
+}
+
 
 class LetterboxdCog(commands.Cog):
     def __init__(self, bot: commands.Bot) -> None:
         self.bot = bot
         self.tmdb_key: Optional[str] = os.getenv("TMDB_API_KEY")
         self.session: Optional[aiohttp.ClientSession] = None
-        # Simple in-memory avatar cache so we don't scrape on every poll
-        self._avatar_cache: dict[str, Optional[str]] = {}
 
     # ------------------------------------------------------------------
     # Lifecycle
     # ------------------------------------------------------------------
 
     async def cog_load(self) -> None:
-        self.session = aiohttp.ClientSession()
+        self.session = aiohttp.ClientSession(headers=REQUEST_HEADERS)
         self.poll_loop.start()
 
     async def cog_unload(self) -> None:
@@ -66,10 +81,30 @@ class LetterboxdCog(commands.Cog):
             await self._scan_user(user)
 
     async def _get_avatar(self, username: str) -> Optional[str]:
-        """Return a cached avatar URL, fetching and caching it if not seen before."""
-        if username not in self._avatar_cache:
-            self._avatar_cache[username] = await get_avatar_url(username, self.session)
-        return self._avatar_cache[username]
+        """
+        Resolve the avatar for a username.
+
+        Avatars are persisted in the DB (per Letterboxd user, shared across
+        guilds). We only hit Letterboxd's profile page when we have nothing
+        saved or the saved URL is due for a refresh; if that scrape fails
+        (e.g. a Cloudflare challenge) we fall back to whatever is stored.
+        Only users never successfully scraped fall through to the placeholder.
+        """
+        saved = await database.get_avatar(username)
+
+        fresh = saved["fetched_at"] is not None and (
+            time.time() - saved["fetched_at"]
+        ) < AVATAR_REFRESH_HOURS * 3600
+        if saved["url"] and fresh:
+            return saved["url"]
+
+        scraped = await get_avatar_url(username)
+        if scraped:
+            await database.save_avatar(username, scraped)
+            return scraped
+
+        # Stale-but-real beats a placeholder
+        return saved["url"]
 
     async def _scan_user(self, user: dict) -> None:
         username: str = user["letterboxd_username"]

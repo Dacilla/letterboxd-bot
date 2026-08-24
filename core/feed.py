@@ -7,6 +7,7 @@ from typing import Optional
 import aiohttp
 import feedparser
 from bs4 import BeautifulSoup, NavigableString, Tag
+from curl_cffi.requests import AsyncSession
 
 
 @dataclass
@@ -26,22 +27,24 @@ class LBEntry:
     tmdb_id: Optional[str]  # TMDB movie ID if present in feed
 
 
-async def get_avatar_url(
-    username: str, session: aiohttp.ClientSession
-) -> Optional[str]:
+async def get_avatar_url(username: str) -> Optional[str]:
     """
     Scrape the Letterboxd profile page and return the user's avatar URL.
     Uses the og:image meta tag which reliably points to the avatar.
+
+    Letterboxd sits behind Cloudflare bot protection that TLS-fingerprints
+    clients: plain Python HTTP stacks (aiohttp, requests) get 403-challenged
+    on HTML pages even with browser headers. curl_cffi impersonates a real
+    Chrome TLS/HTTP2 handshake, which gets through.
     Returns None on any failure.
     """
     url = f"https://letterboxd.com/{username}/"
     try:
-        async with session.get(
-            url, timeout=aiohttp.ClientTimeout(total=10)
-        ) as resp:
-            if resp.status != 200:
-                return None
-            html = await resp.text()
+        async with AsyncSession(impersonate="chrome") as session:
+            resp = await session.get(url, timeout=15)
+        if resp.status_code != 200:
+            return None
+        html = resp.text
     except Exception:
         return None
 
